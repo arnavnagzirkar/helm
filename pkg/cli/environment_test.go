@@ -245,6 +245,35 @@ func TestEnvOrBool(t *testing.T) {
 func TestUserAgentHeaderInK8sRESTClientConfig(t *testing.T) {
 	defer resetEnv()()
 
+	// Use a temporary kubeconfig so the test is not affected by the user's
+	// actual kubeconfig (e.g. a missing or invalid current context).
+	kubeconfig := `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://localhost:6443
+  name: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+current-context: test
+users:
+- name: test
+  user: {}
+`
+	f, err := os.CreateTemp("", "helm-test-kubeconfig-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(kubeconfig); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	t.Setenv("KUBECONFIG", f.Name())
+
 	settings := New()
 	restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 	if err != nil {
