@@ -341,6 +341,42 @@ func TestRepeatableSave(t *testing.T) {
 	}
 }
 
+func TestSourceDateEpoch(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Use a known Unix timestamp for SOURCE_DATE_EPOCH.
+	epochTime := time.Unix(1630000000, 0).UTC()
+	t.Setenv("SOURCE_DATE_EPOCH", "1630000000")
+
+	c := &chart.Chart{
+		Metadata: &chart.Metadata{
+			APIVersion: chart.APIVersionV3,
+			Name:       "ahab",
+			Version:    "1.2.3",
+		},
+		// ModTime is zero so it falls back to sourceDateEpoch().
+		Files: []*common.File{
+			{Name: "scheherazade/shahryar.txt", Data: []byte("1,001 Nights")},
+		},
+	}
+
+	where, err := Save(c, tmp)
+	if err != nil {
+		t.Fatalf("Failed to save: %s", err)
+	}
+
+	allHeaders, err := retrieveAllHeadersFromTar(where)
+	if err != nil {
+		t.Fatalf("Failed to parse tar: %v", err)
+	}
+
+	for _, header := range allHeaders {
+		if !header.ModTime.Equal(epochTime) {
+			t.Errorf("Expected ModTime %v (SOURCE_DATE_EPOCH), got %v for %s", epochTime, header.ModTime, header.Name)
+		}
+	}
+}
+
 func sha256Sum(filePath string) (string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
